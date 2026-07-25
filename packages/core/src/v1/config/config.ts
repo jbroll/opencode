@@ -151,6 +151,9 @@ export const Info = Schema.Struct({
       auto: Schema.optional(Schema.Boolean).annotate({
         description: "Enable automatic compaction when context is full (default: true)",
       }),
+      dedupReads: Schema.optional(Schema.Boolean).annotate({
+        description: "Deduplicate read tool outputs by file path, keeping only the most recent read (default: true)",
+      }),
       prune: Schema.optional(Schema.Boolean).annotate({
         description: "Enable pruning of old tool outputs (default: false)",
       }),
