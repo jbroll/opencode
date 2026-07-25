@@ -52,6 +52,35 @@ function truncateToolOutput(text: string, maxChars?: number) {
   return `${text.slice(0, maxChars)}\n[Tool output truncated for compaction: omitted ${omitted} chars]`
 }
 
+export function deduplicateReads(parts: Part[]): Part[] {
+  const seen = new Map<string, Part>()
+  const superseded = new Set<string>()
+
+  for (const part of parts) {
+    if (part.type !== "tool" || part.tool !== "read") continue
+    if (part.state.status !== "completed") continue
+    const path = part.state.input.filePath
+    const prev = seen.get(path)
+    if (prev && !prev.state.time?.compacted) superseded.add(prev.id)
+    seen.set(path, part)
+  }
+
+  if (superseded.size === 0) return parts
+
+  return parts.map((part) => {
+    if (superseded.has(part.id)) {
+      return {
+        ...part,
+        state: {
+          ...part.state,
+          time: { ...part.state.time, compacted: Date.now() },
+        },
+      }
+    }
+    return part
+  })
+}
+
 export const Event = {
   Updated: SessionV1.Event.MessageUpdated,
   Removed: SessionV1.Event.MessageRemoved,
