@@ -164,6 +164,11 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
 ) {
   const result: UIMessage[] = []
   const toolNames = new Set<string>()
+
+  const allParts = input.flatMap((m) => m.parts)
+  const dedupedParts = deduplicateReads(allParts)
+  const dedupedById = new Map(dedupedParts.map((p) => [p.id, p]))
+
   // Track media from tool results that need to be injected as user messages
   // for providers that don't support that media type in tool results.
   //
@@ -319,10 +324,11 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "tool") {
           toolNames.add(part.tool)
           if (part.state.status === "completed") {
-            const outputText = part.state.time.compacted
+            const effectivePart = dedupedById.get(part.id) ?? part
+            const outputText = effectivePart.state.time.compacted
               ? "[Old tool result content cleared]"
-              : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
-            const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
+              : truncateToolOutput(effectivePart.state.output, options?.toolOutputMaxChars)
+            const attachments = effectivePart.state.time.compacted || options?.stripMedia ? [] : (effectivePart.state.attachments ?? [])
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message

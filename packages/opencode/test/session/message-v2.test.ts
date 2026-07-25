@@ -751,6 +751,85 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
+  test("deduplicates read outputs by file path", async () => {
+    const assistantID = "msg_asst_dedup"
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo("msg_user_dedup"),
+        parts: [
+          { ...basePart("msg_user_dedup", "p-user"), type: "text", text: "read foo.ts" },
+        ] as SessionV1.Part[],
+      },
+      {
+        info: assistantInfo(assistantID, "msg_user_dedup"),
+        parts: [
+          {
+            ...basePart(assistantID, "p-read1"),
+            type: "tool",
+            callID: "call-1",
+            tool: "read",
+            state: {
+              status: "completed",
+              input: { filePath: "/src/foo.ts" },
+              output: "old content",
+              title: "Read",
+              metadata: {},
+              time: { start: 0, end: 1 },
+            },
+          },
+          {
+            ...basePart(assistantID, "p-read2"),
+            type: "tool",
+            callID: "call-2",
+            tool: "read",
+            state: {
+              status: "completed",
+              input: { filePath: "/src/foo.ts" },
+              output: "new content",
+              title: "Read",
+              metadata: {},
+              time: { start: 2, end: 3 },
+            },
+          },
+          {
+            ...basePart(assistantID, "p-bash"),
+            type: "tool",
+            callID: "call-3",
+            tool: "bash",
+            state: {
+              status: "completed",
+              input: { cmd: "ls" },
+              output: "file.ts",
+              title: "Bash",
+              metadata: {},
+              time: { start: 4, end: 5 },
+            },
+          },
+        ] as SessionV1.Part[],
+      },
+    ]
+
+    const result = await MessageV2.toModelMessages(input, model)
+    // Tool results are in "tool" role messages, not in the assistant message
+    const toolResults = result
+      .filter((m) => m.role === "tool")
+      .flatMap((m) => m.content)
+    const readResults = toolResults.filter(
+      (c) => c.type === "tool-result" && c.toolName === "read",
+    )
+    // First read should be compacted (old content cleared)
+    const firstRead = readResults.find((c) => c.toolCallId === "call-1")!
+    expect(firstRead.output.value).toContain("[Old tool result content cleared]")
+    // Second read should have actual content
+    const secondRead = readResults.find((c) => c.toolCallId === "call-2")!
+    expect(secondRead.output.value).toBe("new content")
+    // Bash output should not be affected
+    const bashResult = toolResults.find(
+      (c) => c.type === "tool-result" && c.toolName === "bash",
+    )!
+    expect(bashResult.output.value).toBe("file.ts")
+  })
+
   test("truncates tool output when requested", async () => {
     const userID = "m-user"
     const assistantID = "m-assistant"
