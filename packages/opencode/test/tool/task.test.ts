@@ -536,6 +536,82 @@ describe("tool.task", () => {
     },
   )
 
+  it.instance("execute uses model override from params.model", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let seen: SessionPrompt.PromptInput | undefined
+      const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+      yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+          model: "test-provider/test-model",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      expect(seen?.model?.providerID).toBe(ProviderV2.ID.make("test-provider"))
+      expect(seen?.model?.modelID).toBe(ModelV2.ID.make("test-model"))
+    }),
+  )
+
+  it.instance(
+    "execute model override takes precedence over agent configured model",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+        yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "configurable",
+            model: "override-provider/override-model",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(seen?.model?.providerID).toBe(ProviderV2.ID.make("override-provider"))
+        expect(seen?.model?.modelID).toBe(ModelV2.ID.make("override-model"))
+      }),
+    {
+      config: {
+        agent: {
+          configurable: {
+            mode: "subagent",
+            model: "agent-provider/agent-model",
+          },
+        },
+      },
+    },
+  )
+
   it.instance("rejects background execution when the experiment is disabled", () =>
     Effect.gen(function* () {
       const { chat, assistant } = yield* seed()
