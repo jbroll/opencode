@@ -1,4 +1,4 @@
-Read a file or directory from the local filesystem. If the path does not exist, an error is returned.
+Read a file or directory from the local filesystem. If the path does not exist, an error is returned. Replaces any earlier read of the same file in context — only the most recent read is retained.
 
 Usage:
 - The filePath parameter should be an absolute path.
