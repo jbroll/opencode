@@ -46,7 +46,8 @@ const BaseParameterFields = {
   prompt: Schema.String.annotate({ description: "The task for the agent to perform" }),
   subagent_type: Schema.String.annotate({ description: "The type of specialized agent to use for this task" }),
   model: Schema.optional(Schema.String).annotate({
-    description: 'The model to use for this task (e.g. "openai/gpt-4")',
+    description:
+      "Override the model for this subagent. Format: provider/model-name (e.g. anthropic/claude-haiku-4-20250514). Overrides the agent's configured model.",
   }),
   task_id: Schema.optional(Schema.String).annotate({
     description:
