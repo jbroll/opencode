@@ -61,14 +61,16 @@ export function deduplicateReads(parts: Part[]): Part[] {
     if (part.state.status !== "completed") continue
     const path = part.state.input.filePath
     const prev = seen.get(path)
-    if (prev && !prev.state.time?.compacted) superseded.add(prev.id)
+    if (prev && prev.type === "tool" && prev.tool === "read" && prev.state.status === "completed" && !prev.state.time.compacted) {
+      superseded.add(prev.id)
+    }
     seen.set(path, part)
   }
 
   if (superseded.size === 0) return parts
 
   return parts.map((part) => {
-    if (superseded.has(part.id)) {
+    if (superseded.has(part.id) && part.type === "tool" && part.tool === "read" && part.state.status === "completed") {
       return {
         ...part,
         state: {
@@ -324,20 +326,20 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "tool") {
           toolNames.add(part.tool)
           if (part.state.status === "completed") {
-            const effectivePart = dedupedById.get(part.id) ?? part
-            const outputText = effectivePart.state.time.compacted
+            const effectivePart = (dedupedById.get(part.id) ?? part) as typeof part
+            const outputText = (effectivePart.state as any).time.compacted
               ? "[Old tool result content cleared]"
-              : truncateToolOutput(effectivePart.state.output, options?.toolOutputMaxChars)
-            const attachments = effectivePart.state.time.compacted || options?.stripMedia ? [] : (effectivePart.state.attachments ?? [])
+              : truncateToolOutput((effectivePart.state as any).output, options?.toolOutputMaxChars)
+            const attachments = (effectivePart.state as any).time.compacted || options?.stripMedia ? [] : ((effectivePart.state as any).attachments ?? [])
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
-            const mediaAttachments = attachments.filter((a) => isMedia(a.mime))
-            const extractedMedia = mediaAttachments.filter((a) => !supportsMediaInToolResult(a))
+            const mediaAttachments = attachments.filter((a: { mime: string }) => isMedia(a.mime))
+            const extractedMedia = mediaAttachments.filter((a: { mime: string }) => !supportsMediaInToolResult(a))
             if (extractedMedia.length > 0) {
               media.push(...extractedMedia)
             }
-            const finalAttachments = attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
+            const finalAttachments = attachments.filter((a: { mime: string }) => !isMedia(a.mime) || supportsMediaInToolResult(a))
 
             const output =
               finalAttachments.length > 0

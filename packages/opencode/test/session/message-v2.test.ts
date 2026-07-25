@@ -814,20 +814,21 @@ describe("session.message-v2.toModelMessage", () => {
     const toolResults = result
       .filter((m) => m.role === "tool")
       .flatMap((m) => m.content)
+      .filter((c): c is Extract<typeof c, { type: "tool-result" }> => c.type === "tool-result")
     const readResults = toolResults.filter(
-      (c) => c.type === "tool-result" && c.toolName === "read",
+      (c) => c.toolName === "read",
     )
     // First read should be compacted (old content cleared)
     const firstRead = readResults.find((c) => c.toolCallId === "call-1")!
-    expect(firstRead.output.value).toContain("[Old tool result content cleared]")
+    expect((firstRead.output as any).value).toContain("[Old tool result content cleared]")
     // Second read should have actual content
     const secondRead = readResults.find((c) => c.toolCallId === "call-2")!
-    expect(secondRead.output.value).toBe("new content")
+    expect((secondRead.output as any).value).toBe("new content")
     // Bash output should not be affected
     const bashResult = toolResults.find(
-      (c) => c.type === "tool-result" && c.toolName === "bash",
+      (c) => c.toolName === "bash",
     )!
-    expect(bashResult.output.value).toBe("file.ts")
+    expect((bashResult.output as any).value).toBe("file.ts")
   })
 
   test("truncates tool output when requested", async () => {
@@ -1822,15 +1823,15 @@ describe("session.message-v2.deduplicateReads", () => {
       readPart("msg-3", "p3", "/src/foo.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p1 = result.find((p) => p.id === "prt_p1")!
-    const p2 = result.find((p) => p.id === "prt_p2")!
-    const p3 = result.find((p) => p.id === "prt_p3")!
+    const p1 = result.find((p) => p.id === "prt_p1")! as any
+    const p2 = result.find((p) => p.id === "prt_p2")! as any
+    const p3 = result.find((p) => p.id === "prt_p3")! as any
     expect(p1.state.status).toBe("completed")
-    expect((p1.state as any).time.compacted).toBeTypeOf("number")
+    expect(p1.state.time.compacted).toBeTypeOf("number")
     expect(p2.state.status).toBe("completed")
-    expect((p2.state as any).time.compacted).toBeTypeOf("number")
+    expect(p2.state.time.compacted).toBeTypeOf("number")
     expect(p3.state.status).toBe("completed")
-    expect((p3.state as any).time.compacted).toBeUndefined()
+    expect(p3.state.time.compacted).toBeUndefined()
   })
 
   test("does not mark reads of different paths", () => {
@@ -1839,10 +1840,10 @@ describe("session.message-v2.deduplicateReads", () => {
       readPart("msg-2", "p2", "/src/bar.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p1 = result.find((p) => p.id === "prt_p1")!
-    const p2 = result.find((p) => p.id === "prt_p2")!
-    expect((p1.state as any).time.compacted).toBeUndefined()
-    expect((p2.state as any).time.compacted).toBeUndefined()
+    const p1 = result.find((p) => p.id === "prt_p1")! as any
+    const p2 = result.find((p) => p.id === "prt_p2")! as any
+    expect(p1.state.time.compacted).toBeUndefined()
+    expect(p2.state.time.compacted).toBeUndefined()
   })
 
   test("only deduplicates read tool parts, not bash or edit", () => {
@@ -1853,14 +1854,14 @@ describe("session.message-v2.deduplicateReads", () => {
       readPart("msg-4", "p4", "/src/foo.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p1 = result.find((p) => p.id === "prt_p1")!
-    const p2 = result.find((p) => p.id === "prt_p2")!
-    const p3 = result.find((p) => p.id === "prt_p3")!
-    const p4 = result.find((p) => p.id === "prt_p4")!
-    expect((p1.state as any).time.compacted).toBeUndefined()
-    expect((p2.state as any).time.compacted).toBeUndefined()
-    expect((p3.state as any).time.compacted).toBeTypeOf("number")
-    expect((p4.state as any).time.compacted).toBeUndefined()
+    const p1 = result.find((p) => p.id === "prt_p1")! as any
+    const p2 = result.find((p) => p.id === "prt_p2")! as any
+    const p3 = result.find((p) => p.id === "prt_p3")! as any
+    const p4 = result.find((p) => p.id === "prt_p4")! as any
+    expect(p1.state.time.compacted).toBeUndefined()
+    expect(p2.state.time.compacted).toBeUndefined()
+    expect(p3.state.time.compacted).toBeTypeOf("number")
+    expect(p4.state.time.compacted).toBeUndefined()
   })
 
   test("skips non-completed read parts", () => {
@@ -1877,8 +1878,8 @@ describe("session.message-v2.deduplicateReads", () => {
       readPart("msg-2", "p2", "/src/foo.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p2 = result.find((p) => p.id === "prt_p2")!
-    expect((p2.state as any).time.compacted).toBeUndefined()
+    const p2 = result.find((p) => p.id === "prt_p2")! as any
+    expect(p2.state.time.compacted).toBeUndefined()
   })
 
   test("preserves non-tool parts unchanged", () => {
@@ -1903,24 +1904,24 @@ describe("session.message-v2.deduplicateReads", () => {
       readPart("msg-1", "p1", "/src/foo.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p1 = result.find((p) => p.id === "prt_p1")!
-    expect((p1.state as any).time.compacted).toBeUndefined()
+    const p1 = result.find((p) => p.id === "prt_p1")! as any
+    expect(p1.state.time.compacted).toBeUndefined()
   })
 
   test("already compacted reads stay compacted", () => {
     const alreadyCompacted = {
       ...readPart("msg-1", "p1", "/src/foo.ts"),
-    }
-    ;(alreadyCompacted.state as any).time.compacted = 1000
+    } as any
+    alreadyCompacted.state.time.compacted = 1000
 
     const parts: SessionV1.Part[] = [
       alreadyCompacted,
       readPart("msg-2", "p2", "/src/foo.ts"),
     ]
     const result = MessageV2.deduplicateReads(parts)
-    const p1 = result.find((p) => p.id === "prt_p1")!
-    const p2 = result.find((p) => p.id === "prt_p2")!
-    expect((p1.state as any).time.compacted).toBe(1000)
-    expect((p2.state as any).time.compacted).toBeUndefined()
+    const p1 = result.find((p) => p.id === "prt_p1")! as any
+    const p2 = result.find((p) => p.id === "prt_p2")! as any
+    expect(p1.state.time.compacted).toBe(1000)
+    expect(p2.state.time.compacted).toBeUndefined()
   })
 })
