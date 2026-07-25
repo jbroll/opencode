@@ -653,6 +653,37 @@ describe("tool.task", () => {
     },
   )
 
+  it.instance("execute without model override falls back to parent model for agent with no configured model", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let seen: SessionPrompt.PromptInput | undefined
+      const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+      yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      expect(seen?.model?.providerID).toBe(ref.providerID)
+      expect(seen?.model?.modelID).toBe(ref.modelID)
+    }),
+  )
+
   it.instance("rejects background execution when the experiment is disabled", () =>
     Effect.gen(function* () {
       const { chat, assistant } = yield* seed()
